@@ -1259,6 +1259,98 @@ class LibraryFieldTypesTest(unittest.TestCase):
         self.assertEqual(3601.23, t.format(3601.23))
 
 
+"""Mock sortable objects for Smart Artist Sort Test below"""
+class MockSortableObject():
+    def __init__(self, val1):
+        self.artist_sort = val1
+
+class SmartArtistSortTest(unittest.TestCase):
+    # Tests sorting with no move
+    def test_sort_no_move(self):
+        sas = beets.library.SmartArtistSort({}, True, True)
+
+        o1 = MockSortableObject("A1")
+        o2 = MockSortableObject("A2")
+
+        sorted = sas.sort({
+            o1,
+            o2
+        })
+
+        self.assertEqual(sorted[0], o1)
+        self.assertEqual(sorted[1], o2)
+
+    # Test sorting with a flip
+    def test_sort_asc(self):
+        sas = beets.library.SmartArtistSort({}, True, True)
+
+        o1 = MockSortableObject("A1")
+        o2 = MockSortableObject("A2")
+
+        sorted = sas.sort({
+            o2,
+            o1
+        })
+
+        self.assertEqual(sorted[0], o1)
+        self.assertEqual(sorted[1], o2)
+
+    # Test sort descending
+    def test_sort_desc(self):
+        sas = beets.library.SmartArtistSort({}, False, True)
+
+        o1 = MockSortableObject("A1")
+        o2 = MockSortableObject("A2")
+
+        sorted = sas.sort({
+            o1,
+            o2
+        })
+
+        self.assertEqual(sorted[0], o2)
+        self.assertEqual(sorted[1], o1)
+
+    # Test case insensitive
+    def test_sort_case_insensitive(self):
+        sas = beets.library.SmartArtistSort({}, True, False)
+
+        o1 = MockSortableObject("artist1")
+        o2 = MockSortableObject("ARTIST1")
+
+        sorted = sas.sort({
+            o2,
+            o1
+        })
+
+        self.assertEqual(sorted[0], o2)
+        self.assertEqual(sorted[1], o1)
+
+    # Test sort no album
+    def test_sort_no_album(self):
+        sas = beets.library.SmartArtistSort(None, True, True)
+
+        o1 = MockSortableObject("A1")
+        o2 = MockSortableObject("A2")
+
+        sorted = sas.sort({
+            o2,
+            o1
+        })
+
+        self.assertEqual(sorted[0], o1)
+        self.assertEqual(sorted[1], o2)
+
+
+# Album Test case
+class AlbumTest(unittest.TestCase):
+
+    def test_move_nonexistant_art(self):
+        album = beets.library.Album()
+        album.artpath = "not-a-real-art-path.txt"
+        album.move_art()
+        # verify the art path has been cleared now
+        self.assertEqual(album.artpath, None)
+
 def suite():
     return unittest.TestLoader().loadTestsFromName(__name__)
 

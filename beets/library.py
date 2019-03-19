@@ -49,7 +49,6 @@ log = logging.getLogger('beets')
 
 
 # Library-specific query types.
-
 class PathQuery(dbcore.FieldQuery):
     """A query that matches all items under a given path.
 
@@ -114,6 +113,43 @@ class PathQuery(dbcore.FieldQuery):
         else:
             query_part = '(BYTELOWER({0}) = BYTELOWER(?)) || \
                          (substr(BYTELOWER({0}), 1, ?) = BYTELOWER(?))'
+
+        return query_part.format(self.field), \
+            (file_blob, len(dir_blob), dir_blob)
+
+
+# WindowsPathQuery
+class WindowsPathQuery(PathQuery):
+    def __init__(self, field, pattern, fast=True):
+        """Create a path query for windows systems.
+        `pattern` must be a path, either to a
+        file or a directory.
+        """
+        super(WindowsPathQuery, self).__init__(field, pattern, fast)
+
+        # By default, the case sensitivity depends on the filesystem
+        # that the query path is located on.
+        path = util.bytestring_path(util.normpath(pattern))
+        self.case_sensitive = True
+
+        # Use a normalized-case pattern for case-insensitive matches.
+        pattern = pattern.lower()
+
+        # Match the path as a single file.
+        self.file_path = util.bytestring_path(util.normpath(pattern))
+        # As a directory (prefix).
+        self.dir_path = util.bytestring_path(os.path.join(self.file_path, b''))
+
+    def match(self, item):
+        path = item.path.lower()
+        return (path == self.file_path) or path.startswith(self.dir_path)
+
+    def col_clause(self):
+        file_blob = BLOB_TYPE(self.file_path)
+        dir_blob  = BLOB_TYPE(self.dir_path)
+
+        query_part = '(BYTELOWER({0}) = BYTELOWER(?)) || \
+                     (substr(BYTELOWER({0}), 1, ?) = BYTELOWER(?))'
 
         return query_part.format(self.field), \
             (file_blob, len(dir_blob), dir_blob)
@@ -265,6 +301,15 @@ class SmartArtistSort(dbcore.query.Sort):
                 'WHEN "" THEN {0} '
                 'ELSE {0}_sort END) {1} {2}').format(field, collate, order)
 
+    """
+    Sorting is performed by a variety of keys.
+    It is important to note that album is sorted by either the 'abumartist_sort' key
+    if 'album' is defined. Otherwise it falls back to 'abumartist'.
+
+    Case sensitive sorting, if enabled, sorts in order with respect to the corresponding code points
+    of the characters. This means upper case characters will be sorted as coming before lower-case characters (ASCII ordering).
+    Keep this in mind when disabling case insensitive sorting for ablums.
+    """
     def sort(self, objs):
         if self.album:
             field = lambda a: a.albumartist_sort or a.albumartist
